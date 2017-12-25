@@ -18,7 +18,7 @@ Requirements
 
 On a Debian based Linux:
 ```bash
-sudo apt-get install python python-pycurl rtmpdump ffmpeg mid3v2
+sudo apt-get install python python-pycurl rtmpdump ffmpeg mid3v2 certifi
 ```
 
 Features
