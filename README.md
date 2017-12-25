@@ -1,13 +1,15 @@
-[Maloney Streamfetcher](https://github.com/tschinz/maloney_streamfetcher)
+[Maloney Streamfetcher](https://github.com/dirtbit/maloney_streamfetcher)
 ================================
 
 This Python script let your download the latest Philip Maloney Episodes from the [SRF Website](http://www.srf.ch/sendungen/maloney).
 
+This script is based on tschinz' maloney fetcher: https://github.com/tschinz/maloney_streamfetcher . Just made it work again, and for Python 2.7
+
 Requirements
 ---
-* ``Python 3.0``
+* ``Python 2.7``
   * ``pycurl``
-  * ``xml.dom``
+  * ``certifi``
 * ``rtmpdump`` - For downloading the rtmp stream
 * ``ffmpeg`` - For mp3 conversion
 * ``mid3v2.py`` - For create the id3 tags
@@ -64,6 +66,11 @@ crontab -e
 
 Versions Log
 ---
+- `v1.2, only for Python 2.7`
+  * ADD: if possible try to avoid RTMP, download mp3 via HTTPS instead
+  * CHG: updated broken ID3 data source --> fixed URL, using JSON now
+  * CHG: SRF forces to use https --> using certifi in curl
+
 - `v1.1`
   * ADD: Using Optparse
   * ADD: replace mid3v2 with mid3v2.py

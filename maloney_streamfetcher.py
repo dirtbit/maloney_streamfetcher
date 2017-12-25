@@ -3,11 +3,14 @@
 # Import modules
 #
 import pycurl
-from xml.dom import minidom
-import os, io, re
+import os, io
 import shutil
 import argparse
 import unicodedata
+
+import certifi
+import json
+import urllib2
 
 #-------------------------------------------------------------------------------
 # Class Maloney Download
@@ -26,11 +29,11 @@ class maloney_download:
     self.verbose = verbose
 
   def fetch_latest(self, outdir = None, uid = None):
-    srf_maloney_url   = "http://www.srf.ch/sendungen/maloney/"
+    srf_maloney_url   = "https://www.srf.ch/sendungen/maloney/"
     self.process_maloney_episodes(srf_maloney_url, outdir=outdir, uid=uid)
 
   def fetch_all(self, outdir = None, uid = None):
-    srf_maloney_url    = "http://www.srf.ch/sendungen/maloney/layout/set/ajax/Sendungen/maloney/sendungen/(offset)/"
+    srf_maloney_url    = "https://www.srf.ch/sendungen/maloney/layout/set/ajax/Sendungen/maloney/sendungen/(offset)/"
 
     for i in range(0,510,10): # each page shows 10 items per page, iterate through pages
       url = srf_maloney_url + str(i)
@@ -41,10 +44,10 @@ class maloney_download:
     # Constants
     path_to_ffmpeg   = "ffmpeg"
     path_to_rtmpdump = "rtmpdump"
-    path_to_mid3v2   = "python " + self.path+"/mid3v2.py"
-    path_to_mid3v2   = "mid3v2"
+    path_to_mid3v2   = self.path+"/mid3v2.py"
+    mid3v2   = "python " + path_to_mid3v2
     temp_directory   = "./temp"
-    xml_url          = "http://www.srf.ch/webservice/ais/report/audio/withLiveStreams/"
+    json_url         = "https://il.srgssr.ch/integrationlayer/2.0/srf/mediaComposition/audio/"
 
     # Get user constants
     if outdir == None:
@@ -65,8 +68,8 @@ class maloney_download:
     else:
       uids = [uid]
 
-    # Read XML Data
-    xml_data = self.get_xmldata(xml_url, uids)
+    # Read JSON Data
+    json_data = self.get_jsondata(json_url, uids)
 
     # Download Files
     self.log("Get Episodes")
@@ -75,35 +78,48 @@ class maloney_download:
       os.makedirs(temp_directory)
     cnt = 0
     idx = []
-    for episode in xml_data:
+    for episode in json_data:
       if os.path.isfile(out_dir + "/" + episode["mp3_name"]):
         self.log("  Episode \"{} - {}\" already exists in the output folder {}".format(episode["year"], episode["title"], out_dir + "/" + episode["mp3_name"]))
         self.log("    Skipping Episode ...")
       else:
         idx.append(cnt)
-        # Download with RTMP
-        self.log("  RTMP download...")
-        command = path_to_rtmpdump + " -r " + episode["rtmpurl"] + "  -o \"" + temp_directory + "/stream_dump.flv\""
-        self.system_command(command)
+        
+        # two possibilities for raw data: 
+        #    RTMP: FLV -> MP3 -> add ID3
+        #    HTTPS: MP -> add ID3
+        
+        if episode['httpsurl'] == '':
+          # Download with RTMP
+          self.log("  RTMP download...")
+          command = path_to_rtmpdump + " -r " + episode["rtmpurl"] + "  -o \"" + temp_directory + "/stream_dump.flv\""
+          self.system_command(command)
 
-        # Convert to MP3
-        self.log("  FFMPEG conversion flv to MP3...")
-        command = path_to_ffmpeg + " -y -loglevel panic -stats -i " + temp_directory + "/stream_dump.flv -vn -c:a copy \"" + out_dir + "/" + episode["mp3_name"] + "\""
-        self.system_command(command)
+          # Convert to MP3
+          self.log("  FFMPEG conversion flv to MP3...")
+          command = path_to_ffmpeg + " -y -loglevel panic -stats -i " + temp_directory + "/stream_dump.flv -vn -c:a copy \"" + out_dir + "/" + episode["mp3_name"] + "\""
+          self.system_command(command)
+          
+        else:
+          # Download via HTTPS
+          mp3file = urllib2.urlopen(episode['httpsurl'])
+          with open(episode["mp3_name"],'wb') as output:
+            output.write(mp3file.read())
+          
 
         # Add ID3 Tag
         self.log("  Adding ID3 Tags...")
-        command = ("{} -t \"{} - {}\" \"{}\"").format(path_to_mid3v2, episode["date"], episode["title"], out_dir + "/" + episode["mp3_name"])
+        command = ("{} -t \"{} - {}\" \"{}\"").format(mid3v2, episode["date"], episode["title"], out_dir + "/" + episode["mp3_name"])
         self.system_command(command)
-        command = ("{} -A \"{}\" \"{}\"").format(path_to_mid3v2, "Maloney Philip", out_dir + "/" + episode["mp3_name"])
+        command = ("{} -A \"{}\" \"{}\"").format(mid3v2, "Maloney Philip", out_dir + "/" + episode["mp3_name"])
         self.system_command(command)
-        command = ("{} -a \"{}\" \"{}\"").format(path_to_mid3v2, "Graf Roger", out_dir + "/" + episode["mp3_name"])
+        command = ("{} -a \"{}\" \"{}\"").format(mid3v2, "Graf Roger", out_dir + "/" + episode["mp3_name"])
         self.system_command(command)
-        command = ("{} -g \"{}\" \"{}\"").format(path_to_mid3v2, "Book", out_dir + "/" + episode["mp3_name"])
+        command = ("{} -g \"{}\" \"{}\"").format(mid3v2, "Book", out_dir + "/" + episode["mp3_name"])
         self.system_command(command)
-        command = ("{} -y \"{}\" \"{}\"").format(path_to_mid3v2, episode["year"], out_dir + "/" + episode["mp3_name"])
+        command = ("{} -y \"{}\" \"{}\"").format(mid3v2, episode["year"], out_dir + "/" + episode["mp3_name"])
         self.system_command(command)
-        command = ("{} -c \"{}\" \"{}\"").format(path_to_mid3v2, episode["lead"], out_dir + "/" + episode["mp3_name"])
+        command = ("{} -c \"{}\" \"{}\"").format(mid3v2, episode["lead"], out_dir + "/" + episode["mp3_name"])
         self.system_command(command)
       cnt = cnt + 1
 
@@ -113,7 +129,7 @@ class maloney_download:
     print("------------------------------------------------------")
     print(" Finished downloading {} Episodes from page with offset {}".format(len(idx), offset))
     for id in idx:
-      print("  * {}".format(out_dir + "/" + xml_data[id]["mp3_name"]))
+      print("  * {}".format(out_dir + "/" + json_data[id]["mp3_name"]))
     print("------------------------------------------------------")
     return cnt
 
@@ -123,20 +139,19 @@ class maloney_download:
     c.setopt(c.WRITEFUNCTION, buffer.write)
     c.setopt(c.URL, url)
     c.setopt(c.WRITEDATA, buffer)
+    c.setopt(pycurl.CAINFO, certifi.where())
     c.perform()
     c.close()
     return buffer.getvalue().decode("utf-8")
 
   def parse_html(self, page):
-    #lines = unicodedata.normalize('NFKD', page).encode('ascii','ignore')
-    #lines = str(lines).split("\n")
-    lines = str(page).split("\n")
+    lines = unicodedata.normalize('NFKD', page).encode('ascii','ignore')
+    lines = str(lines).split("\n")
 
     uids = []
 
     for line in lines:
-      if re.search("/popupaudioplayer", line):
-      #if '/popupaudioplayer' in line:
+      if '/popupaudioplayer' in line:
         pos = line.find("?id=") + 4
         uids.append(line[pos:-1])
 
@@ -146,32 +161,41 @@ class maloney_download:
         self.log("  * ID {} = {} ".format(i, uids[i]))
     return uids
 
-  def get_xmldata(self, xmlurl, uids):
-    xml_data = []
+  def get_jsondata(self, jsonurl, uids):
+    json_data = []
     for uid in uids:
-      url = xmlurl + uid  + ".xml"
+      url = jsonurl + uid + ".json"
       page = self.curl_page(url)
-      (mp3_name, title, lead, rtmpurl, year, date) = self.parse_xml(page)
-      xml_data.append({"mp3_name": mp3_name, "title": title, "lead": lead, "rtmpurl":rtmpurl, "year":year, "date":date})
-    return xml_data
-
-  def parse_xml(self, xml):
-    xml = unicodedata.normalize('NFKD', xml).encode('ascii','ignore') # we're not interested in any non-unicode data
-    xmldoc = minidom.parseString(xml)
-    title = xmldoc.getElementsByTagName('title')[0].firstChild.data.replace('/', '_')
-    lead = xmldoc.getElementsByTagName('lead')[0].firstChild.data
-    publishedDate = xmldoc.getElementsByTagName('publishedDate')[0].firstChild.data
-    rtmpurl = xmldoc.getElementsByTagName('rtmpUrl')[0].firstChild.data
-    year = publishedDate[:4]
-    date = publishedDate[:10]
+      (mp3_name, title, lead, rtmpurl, httpsurl, year, date) = self.parse_json(page)
+      json_data.append({"mp3_name": mp3_name, "title": title, "lead": lead, "rtmpurl":rtmpurl, "httpsurl":httpsurl, "year":year, "date":date})
+    return json_data
+      
+  def parse_json(self, json_string):
+    json_string = unicodedata.normalize('NFKD', json_string).encode('ascii','ignore') # we're not interested in any non-unicode data
+    jsonobj = json.loads(json_string)
+    
+    title = jsonobj['chapterList'][0]['title']
+    lead = jsonobj['chapterList'][0]['lead']
+    publishedDate = jsonobj['episode']['publishedDate']
+    
+    for x in range(0, len(jsonobj['chapterList'][0]['resourceList'])):
+        if 'RTMP' in jsonobj['chapterList'][0]['resourceList'][x]['protocol']:
+          rtmpurl = jsonobj['chapterList'][0]['resourceList'][x]['url']
+        if 'HTTPS' in jsonobj['chapterList'][0]['resourceList'][x]['protocol']:
+          httpsurl = jsonobj['chapterList'][0]['resourceList'][x]['url']
+    
+    year = jsonobj['chapterList'][0]['date'][:4]
+    date = jsonobj['chapterList'][0]['date'][:10]
     mp3_name = "{} - Maloney Philip - {}.mp3".format(date, title)
-
+    
     self.log("    MP3 Filename: {}".format(mp3_name))
     self.log("      * Title       :{} Date:{}".format(title, publishedDate, year))
     self.log("      * RTMP Url    :{}".format(rtmpurl))
-    self.log("      * Lead        :{}".format(lead))
-    return(mp3_name, title, lead, rtmpurl, year, date)
-
+    self.log("      * HTTPS Url   :{}".format(httpsurl))
+    self.log("      * Lead        :{}".format(lead))    
+    
+    return (mp3_name, title, lead, rtmpurl, httpsurl, year, date)
+      
   def system_command(self, command):
     self.log(command)
     os.system(command)
