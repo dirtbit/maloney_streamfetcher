@@ -1,8 +1,9 @@
 [Maloney Streamfetcher](https://github.com/dirtbit/maloney_streamfetcher)
 ================================
 
-This script is based on tschinz' maloney fetcher: https://github.com/tschinz/maloney_streamfetcher. All credits to him!!!
-Just made it work again, and made it working for Python 2.7
+This script is based on tschinz' maloney fetcher: https://github.com/tschinz/maloney_streamfetcher. All credits to him!!! 
+
+Just made the script work again, and made it compatible for Python 2.7
 
 This Python script lets you download the latest Philip Maloney Episodes from the [SRF Website](http://www.srf.ch/sendungen/maloney).
 
