@@ -1,9 +1,9 @@
 [Maloney Streamfetcher](https://github.com/dirtbit/maloney_streamfetcher)
 ================================
 
-This script is based on tschinz' maloney fetcher: https://github.com/tschinz/maloney_streamfetcher. All credits to him!!! 
+This script is a fork of tschinz' maloney fetcher: https://github.com/tschinz/maloney_streamfetcher. All credits to him!
 
-Just made the script work again, and made it compatible for Python 2.7
+Just made the script work again and compatible for Python 2.7.
 
 This Python script lets you download the latest Philip Maloney Episodes from the [SRF Website](http://www.srf.ch/sendungen/maloney).
 
@@ -19,7 +19,7 @@ Requirements
 
 On a Debian based Linux:
 ```bash
-sudo apt-get install python python-pycurl rtmpdump ffmpeg mid3v2 certifi
+sudo apt-get install python pycurl rtmpdump ffmpeg certifi
 ```
 
 Features

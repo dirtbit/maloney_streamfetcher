@@ -103,7 +103,7 @@ class maloney_download:
         else:
           # Download via HTTPS
           mp3file = urllib2.urlopen(episode['httpsurl'])
-          with open(episode["mp3_name"],'wb') as output:
+          with open(out_dir + "/" + episode["mp3_name"],'wb') as output:
             output.write(mp3file.read())
           
 
