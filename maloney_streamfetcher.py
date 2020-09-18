@@ -29,7 +29,8 @@ class maloney_download:
     self.verbose = verbose
 
   def fetch_latest(self, outdir = None, uid = None):
-    srf_maloney_url   = "https://www.srf.ch/sendungen/maloney/"
+    #old URL: srf_maloney_url = "https://www.srf.ch/sendungen/maloney/"
+    srf_maloney_url = "https://www.srf.ch/audio/maloney"
     self.process_maloney_episodes(srf_maloney_url, outdir=outdir, uid=uid)
 
   def fetch_all(self, outdir = None, uid = None):
@@ -42,12 +43,18 @@ class maloney_download:
 
   def process_maloney_episodes(self, url, offset = 0, outdir=None, uid=None):
     # Constants
-    path_to_ffmpeg   = "ffmpeg"
-    path_to_rtmpdump = "rtmpdump"
-    path_to_mid3v2   = self.path+"/mid3v2.py"
-    mid3v2   = "python " + path_to_mid3v2
+    path_to_ffmpeg   = self.path
+    ffmpeg = path_to_ffmpeg + "/ffmpeg"
+    
+    path_to_rtmpdump = self.path 
+    rtmpdump = path_to_rtmpdump + "/rtmpdump"
+        
+    path_to_mid3v2   = self.path
+    mid3v2   = "python " + path_to_mid3v2 + "/mid3v2.py"
+
     temp_directory   = "./temp"
-    json_url         = "https://il.srgssr.ch/integrationlayer/2.0/srf/mediaComposition/audio/"
+    #old URL: json_url         = "https://il.srgssr.ch/integrationlayer/2.0/srf/mediaComposition/audio/"
+    json_url         = "https://il.srgssr.ch/integrationlayer/2.0/mediaComposition/byUrn/urn:srf:audio:"
 
     # Get user constants
     if outdir == None:
@@ -92,16 +99,18 @@ class maloney_download:
         if episode['httpsurl'] == '':
           # Download with RTMP
           self.log("  RTMP download...")
-          command = path_to_rtmpdump + " -r " + episode["rtmpurl"] + "  -o \"" + temp_directory + "/stream_dump.flv\""
+          command = rtmpdump + " -r " + episode["rtmpurl"] + "  -o \"" + temp_directory + "/stream_dump.flv\""
           self.system_command(command)
 
           # Convert to MP3
           self.log("  FFMPEG conversion flv to MP3...")
-          command = path_to_ffmpeg + " -y -loglevel panic -stats -i " + temp_directory + "/stream_dump.flv -vn -c:a copy \"" + out_dir + "/" + episode["mp3_name"] + "\""
+          command = ffmpeg + " -y -loglevel panic -stats -i " + temp_directory + "/stream_dump.flv -vn -c:a copy \"" + out_dir + "/" + episode["mp3_name"] + "\""
           self.system_command(command)
           
         else:
           # Download via HTTPS
+          self.log("  HTTPS download...")
+          self.log(episode['httpsurl'])
           mp3file = urllib2.urlopen(episode['httpsurl'])
           with open(out_dir + "/" + episode["mp3_name"],'wb') as output:
             output.write(mp3file.read())
@@ -153,7 +162,7 @@ class maloney_download:
     for line in lines:
       if '/popupaudioplayer' in line:
         pos = line.find("?id=") + 4
-        uids.append(line[pos:-1])
+        uids.append(line[pos:-2])
 
     if (len(uids) > 0):
       self.log("Found ID's")
